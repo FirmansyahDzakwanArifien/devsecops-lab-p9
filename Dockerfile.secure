@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+#
+# Dockerfile hardened untuk aplikasi Flask (Praktikum DevSecOps P9).
+# Nomor [H-xx] merujuk ke tabel hardening checklist di README.md.
+
+# [H-01][H-02] Base image resmi dan minimal (Alpine), dikunci dengan tag versi + digest
+#              supaya build selalu memakai image yang sama persis (tidak bisa diganti diam-diam).
+#              Digest diperbarui otomatis oleh Dependabot (.github/dependabot.yml).
+
+# ---------- Stage 1: builder ----------
+# [H-03] Multi-stage build: pip, cache, dan file build hanya ada di stage ini.
+FROM python:3.14-alpine@sha256:a18b20ad69e74df6cf6d2e1b1a260d7a1ecf5380fd83b310f83ba88c461cf894 AS builder
+WORKDIR /build
+
+# [H-05] Copy hanya file yang dibutuhkan untuk install dependency.
+COPY app/requirements.txt .
+
+# [H-07] Dependency di-pin versi + hash SHA-256 (--require-hashes), tanpa cache pip.
+#        Setelah selesai, pip dibuang dari virtualenv supaya tidak ikut ke runtime.
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --no-cache-dir --require-hashes -r requirements.txt \
+ && /opt/venv/bin/pip uninstall -y pip
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.14-alpine@sha256:a18b20ad69e74df6cf6d2e1b1a260d7a1ecf5380fd83b310f83ba88c461cf894 AS runtime
+
+# [H-15] Metadata OCI supaya asal image bisa ditelusuri.
+LABEL org.opencontainers.image.title="devsecops-lab-p9" \
+      org.opencontainers.image.description="Flask app untuk praktikum Container Security P9" \
+      org.opencontainers.image.source="https://github.com/FirmansyahDzakwanArifien/devsecops-lab-p9"
+
+# [H-08] Patch paket OS terbaru + buang pip/setuptools bawaan image (tidak dipakai saat runtime).
+# [H-09] Hapus bit setuid/setgid supaya tidak ada binary yang bisa dipakai untuk naik ke root.
+# [H-04] User non-root dengan UID/GID tetap, tanpa home directory dan tanpa shell login.
+RUN apk upgrade --no-cache \
+ && python -m pip uninstall -y pip \
+ && rm -rf /usr/local/lib/python3.14/ensurepip /root/.cache \
+ && find / -xdev -perm /6000 -type f -exec chmod a-s {} + \
+ && addgroup -g 10001 -S app \
+ && adduser -u 10001 -S -G app -H -h /nonexistent -s /sbin/nologin app
+
+# [H-05] Kode aplikasi dimiliki root dan read-only bagi user app (tidak bisa dimodifikasi saat runtime).
+#        WORKDIR dibuat lebih dulu (755, milik root) agar --chmod=0444 hanya berlaku untuk file.
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+COPY --chmod=0444 app/app.py ./app.py
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+# [H-06] Tidak ada credential di image. APP_SECRET di-inject saat runtime (lihat docker-compose.yml).
+
+# [H-04] Jalankan sebagai user non-root (format UID:GID numerik).
+USER 10001:10001
+
+# [H-11] Port unprivileged (>1024), jadi tidak butuh capability NET_BIND_SERVICE.
+EXPOSE 8080
+
+# [H-10] Healthcheck tanpa menambah curl/wget ke image.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+
+# [H-11] Exec form + WSGI server production (gunicorn), bukan development server Flask.
+#        --worker-tmp-dir /dev/shm supaya tetap jalan saat root filesystem read-only.
+ENTRYPOINT ["gunicorn"]
+CMD ["--bind", "0.0.0.0:8080", "--workers", "2", "--worker-tmp-dir", "/dev/shm", "--access-logfile", "-", "app:app"]

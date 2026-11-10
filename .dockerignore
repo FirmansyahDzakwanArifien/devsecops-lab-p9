@@ -1,0 +1,27 @@
+# Credential dan config rahasia
+.env
+*.env
+.env.*
+
+# Git dan CI
+.git
+.gitignore
+.github/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Test dan dokumentasi
+tests/
+docs/
+*.md
+Dockerfile*
+docker-compose*.yml
