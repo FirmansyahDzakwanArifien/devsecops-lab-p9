@@ -1,0 +1,15 @@
+# Custom rule Falco (Praktikum P9, Tugas 4).
+# Rule bawaan Falco tidak memberi alert untuk pembacaan /etc/passwd karena file itu memang
+# world-readable dan sering dibaca proses normal. Di container aplikasi, membaca /etc/passwd
+# lewat shell biasanya tanda pengintaian (enumerasi user), jadi dibuat rule khusus.
+- rule: Read passwd file in container
+  desc: Proses shell atau utilitas teks membaca /etc/passwd di dalam container
+  condition: >
+    open_read and container
+    and fd.name = /etc/passwd
+    and proc.name in (cat, head, tail, less, more, grep, awk, sed, sh, bash, dash)
+  output: >
+    /etc/passwd dibaca di container (user=%user.name uid=%user.uid command=%proc.cmdline
+    container=%container.name image=%container.image.repository)
+  priority: NOTICE
+  tags: [container, discovery, mitre_discovery, T1087]

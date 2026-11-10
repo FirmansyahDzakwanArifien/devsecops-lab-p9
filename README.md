@@ -85,3 +85,30 @@ Beberapa hal sengaja dibuat berbeda dari contoh di panduan:
 | tanpa blok `permissions` | `security-events: write` | token default repo baru hanya read, sehingga upload SARIF ditolak |
 | satu langkah Trivy SARIF + `exit-code: 1` | SARIF (semua severity) lalu gate terpisah | SARIF tetap lengkap dan tetap ter-upload, gate tetap tegas |
 | `dependency-scan` hanya `vuln` | `vuln,secret,misconfig` | Dockerfile dan compose ikut diperiksa |
+
+## Runtime security (Falco)
+
+Hardening dan scanning bersifat pencegahan. Falco melengkapinya dengan deteksi saat container sudah berjalan.
+
+```bash
+docker run --rm -d --name falco --privileged \
+  -v /var/run/docker.sock:/host/var/run/docker.sock \
+  -v /dev:/host/dev -v /proc:/host/proc:ro -v /boot:/host/boot:ro \
+  -v /lib/modules:/host/lib/modules:ro -v /usr:/host/usr:ro \
+  -v "$PWD/falco/falco_rules.local.yaml:/etc/falco/falco_rules.local.yaml:ro" \
+  falcosecurity/falco:latest
+docker logs -f falco
+```
+
+`falco/falco_rules.local.yaml` berisi satu rule tambahan untuk pembacaan `/etc/passwd` di container. Rule bawaan Falco sengaja tidak mengawasi file ini karena memang boleh dibaca semua user.
+
+Hasil uji (Falco 0.45.2, driver modern eBPF, WSL2 kernel 6.6):
+
+| Aksi | Container `nginx` (root, default) | Container `p9-web` (hardened) |
+|---|---|---|
+| Shell dengan terminal (`docker exec -it`) | Notice: shell spawned | Notice: shell spawned (uid 10001) |
+| `cat /etc/shadow` | Warning: sensitive file opened | gagal, *Permission denied* |
+| `find / -name id_rsa*` | Warning: private key search | - |
+| Menimpa file di `/var/log` | Warning: log files tampered | gagal, *Read-only file system* |
+| Copy binary ke `/tmp` lalu dijalankan | Critical: binary not part of base image | gagal, `/tmp` noexec |
+| `cat /etc/passwd` | Notice (custom rule) | Notice (custom rule) |
