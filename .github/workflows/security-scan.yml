@@ -1,0 +1,59 @@
+name: Container Security Scan
+
+# Scan otomatis setiap push ke main/develop dan setiap pull request ke main.
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+# Least privilege untuk GITHUB_TOKEN. security-events: write dibutuhkan untuk upload SARIF.
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  build-and-scan:
+    name: Build & Security Scan
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: devsecops-lab-p9:${{ github.sha }}
+
+    steps:
+      # Semua action di-pin ke commit SHA (bukan tag/branch) karena tag bisa digeser.
+      # Contoh nyata: tag trivy-action pernah di-force-push ke commit berbahaya (CVE-2026-33634, Maret 2026).
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build Docker image
+        run: docker build -f Dockerfile.secure -t "$IMAGE" .
+
+      # Laporan lengkap (semua severity) dalam format SARIF untuk tab Security.
+      - name: Trivy scan (SARIF, semua severity)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy-results.sarif
+          scanners: vuln,secret,misconfig
+          exit-code: "0"
+
+      - name: Upload hasil scan ke GitHub Security
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: container-scanning
+
+      # Gate fail-fast: pipeline gagal bila ada CVE CRITICAL/HIGH.
+      - name: Trivy gate (CRITICAL/HIGH, fail fast)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_SKIP_DB_UPDATE: "true"
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
