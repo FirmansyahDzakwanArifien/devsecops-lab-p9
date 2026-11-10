@@ -34,6 +34,7 @@ jobs:
       - name: Trivy scan (SARIF, semua severity)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2   # versi Trivy dikunci, sama dengan yang dipakai lokal
           image-ref: ${{ env.IMAGE }}
           format: sarif
           output: trivy-results.sarif
@@ -53,6 +54,7 @@ jobs:
         env:
           TRIVY_SKIP_DB_UPDATE: "true"
         with:
+          version: v0.76.2   # versi Trivy dikunci, sama dengan yang dipakai lokal
           image-ref: ${{ env.IMAGE }}
           format: table
           severity: CRITICAL,HIGH

@@ -5,6 +5,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Hanya update patch + digest. Naik minor Python (3.14 -> 3.15) diputuskan manual
+    # karena path python3.14 dipakai di Dockerfile dan perlu diuji ulang.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: pip
     directory: /app
     schedule:

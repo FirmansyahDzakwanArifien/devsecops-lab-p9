@@ -79,6 +79,7 @@ Beberapa hal sengaja dibuat berbeda dari contoh di panduan:
 | Di panduan | Di repo ini | Alasan |
 |---|---|---|
 | `aquasecurity/trivy-action@master` | di-pin ke commit SHA rilis v0.36.0 | branch/tag bisa digeser. Tag trivy-action pernah di-force-push ke kode pencuri secret (CVE-2026-33634, Maret 2026). |
+| versi Trivy mengikuti default action (v0.70.0) | `version: v0.76.2` | hasil CI sama dengan scan lokal |
 | `codeql-action/upload-sarif@v3` | v4.39.3 (SHA) | versi terbaru |
 | `actions/checkout@v4` | v7.0.1 (SHA) | versi terbaru |
 | tanpa blok `permissions` | `security-events: write` | token default repo baru hanya read, sehingga upload SARIF ditolak |
