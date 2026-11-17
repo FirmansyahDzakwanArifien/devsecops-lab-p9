@@ -9,7 +9,7 @@
 
 # ---------- Stage 1: builder ----------
 # [H-03] Multi-stage build: pip, cache, dan file build hanya ada di stage ini.
-FROM python:3.14-alpine@sha256:a18b20ad69e74df6cf6d2e1b1a260d7a1ecf5380fd83b310f83ba88c461cf894 AS builder
+FROM python:3.14-alpine@sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67 AS builder
 WORKDIR /build
 
 # [H-05] Copy hanya file yang dibutuhkan untuk install dependency.
@@ -22,7 +22,7 @@ RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip uninstall -y pip
 
 # ---------- Stage 2: runtime ----------
-FROM python:3.14-alpine@sha256:a18b20ad69e74df6cf6d2e1b1a260d7a1ecf5380fd83b310f83ba88c461cf894 AS runtime
+FROM python:3.14-alpine@sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67 AS runtime
 
 # [H-15] Metadata OCI supaya asal image bisa ditelusuri.
 LABEL org.opencontainers.image.title="devsecops-lab-p9" \
